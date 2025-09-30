@@ -52,7 +52,7 @@ if phase == 0:
             sh.append_row([username, password])
             st.success("Registrierung erfolgreich! Du kannst dich jetzt anmelden.")
 
-if phase == 1:
+elif phase == 1:
     st.subheader("Übung hinzufügen")
 
     exercise = st.text_input("Übung")
