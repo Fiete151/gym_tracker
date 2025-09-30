@@ -17,7 +17,7 @@ def save_data(entry):
         f.write("\n")
 
 # --- App-Titel ---
-st.title("Mini Gym Tracker 💪")
+st.title("Mini Gym Tracker 💪, Updated, second time")
 
 # --- Neue Übung eintragen ---
 st.subheader("Neue Übung eintragen")
