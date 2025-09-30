@@ -6,6 +6,8 @@ from google.oauth2.service_account import Credentials
 from datetime import datetime
 
 
+
+service_account_info = json.loads(st.secrets["GOOGLE_CREDS"])
 # 1️⃣ Google Sheets Zugang einrichten
 scopes = [
     "https://www.googleapis.com/auth/spreadsheets",
