@@ -5,15 +5,17 @@ import gspread
 from google.oauth2.service_account import Credentials
 from datetime import datetime
 
+st.json(st.secrets["GOOGLE_CREDS"])
 
 
 service_account_info = json.loads(st.secrets["GOOGLE_CREDS"])
+
 # 1️⃣ Google Sheets Zugang einrichten
 scopes = [
     "https://www.googleapis.com/auth/spreadsheets",
     "https://www.googleapis.com/auth/drive"
 ]
-creds = Credentials.from_service_account_file("service_account.json", scopes=scopes)
+creds = Credentials.from_service_account_info(service_account_info, scopes=scopes)
 gc = gspread.authorize(creds)
 
 
