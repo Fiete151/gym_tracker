@@ -52,7 +52,29 @@ if phase == 0:
             sh.append_row([username, password])
             st.success("Registrierung erfolgreich! Du kannst dich jetzt anmelden.")
 
+if phase == 1:
+    st.subheader("Übung hinzufügen")
+
+    exercise = st.text_input("Übung")
+    weight = st.text_input("Gewicht (kg)")
+    reps = st.text_input("Wiederholungen")
+    set_num = st.text_input("Satz")
+
+    if st.button("Hinzufügen"):
+        # Eingaben prüfen
+        if not exercise or not weight or not reps or not set_num:
+            st.error("Bitte alle Felder ausfüllen.")
+        else:
+            try:
+                # Optional: numerische Felder prüfen
+                weight_val = float(weight)
+                reps_val = int(reps)
+                set_val = int(set_num)
+
+                # In Google Sheet eintragen
+                sh.append_row([exercise, weight_val, reps_val, set_val])
+                st.success(f"Übung '{exercise}' erfolgreich hinzugefügt!")
 
 
-
-
+            except ValueError:
+                st.error("Gewicht muss eine Zahl, Wiederholungen und Satz ganze Zahlen sein.")
