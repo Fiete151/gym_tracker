@@ -1,54 +1,46 @@
 import streamlit as st
 import json
 import os
+import gspread
+from google.oauth2.service_account import Credentials
+from datetime import datetime
 
-DATA_FILE = "training_data.json"
 
-# --- Funktionen ---
-def load_data():
-    if os.path.exists(DATA_FILE):
-        with open(DATA_FILE, "r") as f:
-            return [json.loads(line) for line in f]
-    return []
+# 1️⃣ Google Sheets Zugang einrichten
+scopes = [
+    "https://www.googleapis.com/auth/spreadsheets",
+    "https://www.googleapis.com/auth/drive"
+]
+creds = Credentials.from_service_account_file("service_account.json", scopes=scopes)
+gc = gspread.authorize(creds)
 
-def save_data(entry):
-    with open(DATA_FILE, "a") as f:
-        json.dump(entry, f)
-        f.write("\n")
+
+# 2️⃣ Sheet öffnen
+sh = gc.open("gym_tracker_data").sheet1  # Name deines Sheets
+
+
+phase = 0
 
 # --- App-Titel ---
 st.title("Mini Gym Tracker 💪, Updated, second time")
 
-# --- Neue Übung eintragen ---
-st.subheader("Neue Übung eintragen")
-exercise = st.text_input("Übung")
-weight = st.number_input("Gewicht (kg)", min_value=0, step=1)
-reps = st.number_input("Wiederholungen", min_value=0, step=1)
-sets = st.number_input("Sätze", min_value=0, step=1)
 
-if st.button("Speichern"):
-    if exercise:
-        entry = {"exercise": exercise, "weight": weight, "reps": reps, "sets": sets}
-        save_data(entry)
-        st.success(f"{exercise} gespeichert!")
-    else:
-        st.error("Bitte Übungsnamen eingeben!")
 
-# --- Fortschritt anzeigen ---
-st.subheader("Fortschritt anzeigen")
-data = load_data()
+if phase == 0:
+    username = st.text_input("Benutzername")
+    password = st.text_input("Passwort")
+    st.subheader("Anmelden/Registrieren")
+    if st.button("Anmelden"):
+        st.subheader("Anmelden/Registrieren")
+    elif st.button("Registrieren"):
+        users = sh.col_values(1)
+        if username in users:
+            st.error("Benutzername bereits vergeben")
+        else:
+            sh.append_row([username, password])
+            st.success("Registrierung erfolgreich! Du kannst dich jetzt anmelden.")
 
-if data:
-    # Auswahl der Übung
-    exercises = list(set([d["exercise"] for d in data]))
-    selected = st.selectbox("Übung auswählen", exercises)
 
-    # Daten filtern
-    filtered = [d for d in data if d["exercise"] == selected]
 
-    # Tabelle anzeigen
-    st.write(f"Alle Einträge für **{selected}**:")
-    st.table(filtered)
 
-else:
-    st.info("Noch keine Trainingsdaten vorhanden. Trage zuerst Übungen ein!")
+
