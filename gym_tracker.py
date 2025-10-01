@@ -8,7 +8,7 @@ import altair as alt
 
 
 # --- Konfig ---
-USE_OFFLINE = False # 👈 Umschalten zwischen lokal/online
+USE_OFFLINE = True # 👈 Umschalten zwischen lokal/online
 
 # --- Credentials laden ---
 if USE_OFFLINE:
@@ -138,7 +138,7 @@ elif st.session_state["phase"] == 1:
         filtered_df = user_df
 
     # --- Zeitraum-Auswahl ---
-    filtered_df["date"] = pd.to_datetime(filtered_df["date"])
+    filtered_df["date"] = pd.to_datetime(filtered_df["date"], errors='coerce')
     min_date = filtered_df["date"].min()
     max_date = filtered_df["date"].max()
 
@@ -155,8 +155,14 @@ elif st.session_state["phase"] == 1:
         filtered_df = filtered_df[(filtered_df["date"] >= pd.to_datetime(start_date)) &
                                   (filtered_df["date"] <= pd.to_datetime(end_date))]
 
+
+    # Für die Tabelle nur das Datum als String (keine Uhrzeit)
+    display_df = filtered_df.copy()
+    display_df["date"] = display_df["date"].dt.strftime("%Y-%m-%d")
+
     # Tabelle anzeigen
-    st.table(filtered_df)
+    st.table(display_df)
+
 
     # --- Linien-Diagramm (nur für eine Übung) ---
     if selected_exercise != "Alle" and not filtered_df.empty:
