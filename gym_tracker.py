@@ -8,7 +8,7 @@ import altair as alt
 
 
 # --- Konfig ---
-USE_OFFLINE = True # 👈 Umschalten zwischen lokal/online
+USE_OFFLINE = F # 👈 Umschalten zwischen lokal/online
 
 # --- Credentials laden ---
 if USE_OFFLINE:
