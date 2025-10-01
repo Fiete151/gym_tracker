@@ -8,7 +8,7 @@ import pandas as pd
 
 
 # --- Konfig ---
-USE_OFFLINE = True  # 👈 Umschalten zwischen lokal/online
+USE_OFFLINE = False  # 👈 Umschalten zwischen lokal/online
 
 # --- Credentials laden ---
 if USE_OFFLINE:
