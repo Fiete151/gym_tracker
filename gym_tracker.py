@@ -4,11 +4,11 @@ import gspread
 from google.oauth2.service_account import Credentials
 from datetime import date
 import pandas as pd
-
+import altair as alt
 
 
 # --- Konfig ---
-USE_OFFLINE = False  # 👈 Umschalten zwischen lokal/online
+USE_OFFLINE = True  # 👈 Umschalten zwischen lokal/online
 
 # --- Credentials laden ---
 if USE_OFFLINE:
@@ -80,41 +80,161 @@ if st.session_state["phase"] == 0:
 elif st.session_state["phase"] == 1:
     st.subheader(f"Übung hinzufügen (eingeloggt als {st.session_state['username']})")
 
+    # Vorhandene Übungen aus Google Sheets für Autocomplete
+    all_exercises = [row['exercise'] for row in trainings_sh.get_all_records()]
+    unique_exercises = sorted(list(set(all_exercises)))
+
     with st.form("exercise_form"):
-        exercise = st.text_input("Übung")
-        weight = st.text_input("Gewicht (kg)")
-        reps = st.text_input("Wiederholungen")
-        set_num = st.text_input("Satz")
+        # Übungsauswahl (Vorschläge + Möglichkeit neue einzugeben)
+        exercise = st.selectbox(
+            "Übung (bereits vorhandene Übungen werden vorgeschlagen)",
+            options=unique_exercises + ["Neue Übung..."]
+        )
+        if exercise == "Neue Übung...":
+            exercise = st.text_input("Neue Übung eingeben")
+
+        # Gewicht & Wiederholungen als numerische Eingaben
+        weight = st.number_input("Gewicht (kg)", min_value=0.0, step=0.5)
+        reps = st.number_input("Wiederholungen", min_value=1, step=1)
+
+        # Satz als Dropdown 1-4
+        set_num = st.selectbox("Satz", options=[1, 2, 3, 4])
 
         submitted = st.form_submit_button("Hinzufügen")
 
     if submitted:
-        if not exercise or not weight or not reps or not set_num:
-            st.error("Bitte alle Felder ausfüllen.")
+        if not exercise:
+            st.error("Bitte die Übung angeben.")
         else:
-            try:
-                weight_val = float(weight)
-                reps_val = int(reps)
-                set_val = int(set_num)
-                today = date.today().isoformat()
-
-                trainings_sh.append_row([st.session_state["username"], today, exercise, weight_val, reps_val, set_val])
-                st.success(f"Übung '{exercise}' erfolgreich hinzugefügt!")
-            except ValueError:
-                st.error("Gewicht muss eine Zahl, Wiederholungen und Satz ganze Zahlen sein.")
+            today = date.today().isoformat()
+            trainings_sh.append_row([st.session_state["username"], today, exercise, weight, int(reps), set_num])
+            st.success(f"Übung '{exercise}' erfolgreich hinzugefügt!")
 
     if st.button("Abmelden"):
         st.session_state["phase"] = 0
         st.session_state["username"] = None
         st.rerun()
 
-    all_data = trainings_sh.get_all_records()  # Liste von Dictionaries
-    df = pd.DataFrame(all_data)  # in DataFrame umwandeln
+    # --- Trainingsdaten aus Google Sheets ---
+    all_data = trainings_sh.get_all_records()
+    df = pd.DataFrame(all_data)
 
-    # --- Nur aktuelle User-Daten ---
+    # Spalten bereinigen
+    df.columns = [c.strip().lower() for c in df.columns]
+
+    # Nur aktuelle User-Daten
     user_df = df[df["user"] == st.session_state["username"]]
 
-    # --- Tabelle anzeigen ---
     st.subheader("Meine Trainingsdaten")
-    st.dataframe(user_df)
 
+    # --- Dropdown zum Filtern nach Übung ---
+    exercises = user_df["exercise"].unique().tolist()
+    selected_exercise = st.selectbox("Welche Übung anzeigen?", ["Alle"] + exercises)
+
+    # Tabelle filtern für Linien-Diagramm
+    if selected_exercise != "Alle":
+        filtered_df = user_df[user_df["exercise"] == selected_exercise]
+    else:
+        filtered_df = user_df
+
+    # --- Zeitraum-Auswahl ---
+    filtered_df["date"] = pd.to_datetime(filtered_df["date"])
+    min_date = filtered_df["date"].min()
+    max_date = filtered_df["date"].max()
+
+    date_range = st.date_input(
+        "Zeitraum wählen",
+        value=[min_date, max_date],
+        min_value=min_date,
+        max_value=max_date
+    )
+
+    # Filter nach Zeitraum
+    if len(date_range) == 2:
+        start_date, end_date = date_range
+        filtered_df = filtered_df[(filtered_df["date"] >= pd.to_datetime(start_date)) &
+                                  (filtered_df["date"] <= pd.to_datetime(end_date))]
+
+    # Tabelle anzeigen
+    st.dataframe(filtered_df)
+
+    # --- Linien-Diagramm (nur für eine Übung) ---
+    if selected_exercise != "Alle" and not filtered_df.empty:
+        filtered_df["weight"] = filtered_df["weight"].astype(float)
+        filtered_df["reps"] = filtered_df["reps"].astype(int)
+        filtered_df["set"] = filtered_df["set"].astype(str)
+
+        line_chart = alt.Chart(filtered_df).mark_line(point=True).encode(
+            x='date:T',
+            y='reps:Q',
+            color=alt.Color('weight:Q', scale=alt.Scale(scheme='viridis'), title='Gewicht (kg)'),
+            detail='set:N',
+            tooltip=['date:T', 'exercise:N', 'weight:Q', 'reps:Q', 'set:N']
+        ).properties(
+            title=f"Reps-Verlauf bei {selected_exercise} (Linien nach Satznummer)"
+        )
+
+        st.altair_chart(line_chart, use_container_width=True)
+
+    # --- Prozent-Fortschritt-Diagramm ---
+    chart = alt.Chart(filtered_df).mark_line(point=True).encode(
+        x='date:T',
+        y='weight:Q',
+        color='exercise:N',
+        tooltip=['date:T', 'exercise:N', 'weight:Q', 'weight_pct:Q']
+    ).properties(
+        title="Prozentualer Gewicht-Fortschritt pro Übung"
+    )
+
+    st.altair_chart(chart, use_container_width=True)
+
+
+
+    st.subheader("Meine Trainingsdaten bearbeiten")
+
+    # Button, um Bearbeitungsmodus zu aktivieren
+    if st.button("Daten bearbeiten"):
+        st.session_state["edit_mode"] = True
+
+    if st.session_state.get("edit_mode", False):
+        # Sortierbare Tabelle
+        sort_col = st.selectbox("Sortiere nach", user_df.columns, index=user_df.columns.get_loc("date"))
+        df_sorted = user_df.sort_values(by=sort_col, ignore_index=True)
+        st.dataframe(df_sorted)
+
+        # Expander für Bearbeitung
+        with st.expander("Zeile bearbeiten"):
+            row = st.number_input("Zeile (0-basiert)", 0, len(df_sorted) - 1, 0)
+
+            # Nur bearbeitbare Spalten anzeigen (user nicht)
+            editable_cols = [c for c in df_sorted.columns if c != "user"]
+            col = st.selectbox("Spalte", editable_cols)
+            new_value = st.text_input("Neuer Wert", df_sorted.at[row, col])
+
+            if st.button("Speichern"):
+                old_value = df_sorted.at[row, col]
+                df_sorted.at[row, col] = new_value  # zeigt sofort die Änderung in Tabelle
+                st.success(f"Zeile {row}, Spalte '{col}' von '{old_value}' zu '{new_value}' aktualisiert!")
+
+                # Daten zurück in Google Sheets schreiben
+                all_data = trainings_sh.get_all_records()
+                all_df = pd.DataFrame(all_data)
+                all_df.columns = [c.strip().lower() for c in all_df.columns]
+
+                # Zeile in all_df finden, die geändert werden soll
+                user_rows = all_df[all_df["user"] == st.session_state["username"]].reset_index()
+                target_index = user_rows.at[row, "index"]
+
+                # Wert aktualisieren
+                all_df.at[target_index, col] = new_value
+
+                # Zeile in native Python-Typen konvertieren (JSON-kompatibel)
+                row_values = all_df.iloc[target_index].apply(lambda x: x.item() if hasattr(x, "item") else x).tolist()
+
+                # Ganze Zeile zurückschreiben (Google Sheets Zeilen starten bei 1)
+                trainings_sh.update(f"A{target_index + 2}:F{target_index + 2}", [row_values])
+
+                # Bearbeitungsmodus ausschalten
+                st.session_state["edit_mode"] = False
+                st.info("Änderung gespeichert! Die Tabelle wird automatisch aktualisiert.")
+                st.rerun()
