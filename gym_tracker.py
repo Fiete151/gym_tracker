@@ -8,7 +8,7 @@ import altair as alt
 
 
 # --- Konfig ---
-USE_OFFLINE = False # 👈 Umschalten zwischen lokal/online
+USE_OFFLINE = True # 👈 Umschalten zwischen lokal/online
 
 # --- Credentials laden ---
 if USE_OFFLINE:
@@ -156,7 +156,7 @@ elif st.session_state["phase"] == 1:
                                   (filtered_df["date"] <= pd.to_datetime(end_date))]
 
     # Tabelle anzeigen
-    st.dataframe(filtered_df)
+    st.table(filtered_df)
 
     # --- Linien-Diagramm (nur für eine Übung) ---
     if selected_exercise != "Alle" and not filtered_df.empty:
@@ -200,7 +200,7 @@ elif st.session_state["phase"] == 1:
         # Sortierbare Tabelle
         sort_col = st.selectbox("Sortiere nach", user_df.columns, index=user_df.columns.get_loc("date"))
         df_sorted = user_df.sort_values(by=sort_col, ignore_index=True)
-        st.dataframe(df_sorted)
+        st.table(df_sorted)
 
         # Expander für Bearbeitung
         with st.expander("Zeile bearbeiten"):
