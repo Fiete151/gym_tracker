@@ -94,7 +94,7 @@ elif st.session_state["phase"] == 1:
             exercise = st.text_input("Neue Übung eingeben")
 
         # Gewicht & Wiederholungen als numerische Eingaben
-        weight = st.number_input("Gewicht (kg)", min_value=0.0, step=0.5)
+        weight = st.number_input("Gewicht (kg), nur ganze Zahlen", min_value=0, step=1, format="%d")
         reps = st.number_input("Wiederholungen", min_value=1, step=1)
 
         # Satz als Dropdown 1-4
@@ -107,7 +107,14 @@ elif st.session_state["phase"] == 1:
             st.error("Bitte die Übung angeben.")
         else:
             today = date.today().isoformat()
-            trainings_sh.append_row([st.session_state["username"], today, exercise, weight, int(reps), set_num])
+            trainings_sh.append_row([
+                st.session_state["username"],
+                today,
+                exercise,
+                int(weight),  # als String speichern, keine Nachkommastellen
+                int(reps),
+                set_num
+            ])
             st.success(f"Übung '{exercise}' erfolgreich hinzugefügt!")
 
     if st.button("Abmelden"):
@@ -183,17 +190,45 @@ elif st.session_state["phase"] == 1:
         st.altair_chart(line_chart, use_container_width=True)
 
     # --- Prozent-Fortschritt-Diagramm ---
-    chart = alt.Chart(filtered_df).mark_line(point=True).encode(
-        x='date:T',
-        y='weight:Q',
-        color='exercise:N',
-        tooltip=['date:T', 'exercise:N', 'weight:Q', 'weight_pct:Q']
-    ).properties(
-        title="Prozentualer Gewicht-Fortschritt pro Übung"
+
+    # Auswahlbox mit Häkchen für mehrere Übungen
+    selected_exercises_multi = st.multiselect(
+        "Welche Übungen im Fortschrittsdiagramm anzeigen?",
+        options=sorted(user_df["exercise"].unique().tolist()),
+        default=sorted(user_df["exercise"].unique().tolist())  # standardmäßig alle
     )
 
-    st.altair_chart(chart, use_container_width=True)
+    # Daten filtern
+    if selected_exercises_multi:
+        filtered_chart_df = filtered_df[filtered_df["exercise"].isin(selected_exercises_multi)].copy()
+    else:
+        filtered_chart_df = filtered_df.copy()
 
+    # Prozentualen Fortschritt berechnen
+    if not filtered_chart_df.empty:
+        filtered_chart_df["weight"] = filtered_chart_df["weight"].astype(float)
+
+        # Erste Werte pro Übung finden
+        base_weights = filtered_chart_df.groupby("exercise")["weight"].transform("first")
+
+        # Prozentualer Fortschritt relativ zum Start
+        filtered_chart_df["progress_pct"] = (filtered_chart_df["weight"] / base_weights) * 100
+
+        y_max = filtered_chart_df["progress_pct"].max() * 1.1
+
+        # Diagramm
+        chart = alt.Chart(filtered_chart_df).mark_line(point=True).encode(
+            x='date:T',
+            y=alt.Y('progress_pct:Q', title='Fortschritt (%)', scale=alt.Scale(domain=[100, y_max])),
+            color='exercise:N',
+            tooltip=['date:T', 'exercise:N', 'weight:Q', 'progress_pct:Q']
+        ).properties(
+            title="Prozentualer Fortschritt pro Übung"
+        )
+
+        st.altair_chart(chart, use_container_width=True)
+    else:
+        st.info("Keine Daten für die ausgewählten Übungen.")
 
 
     st.subheader("Meine Trainingsdaten bearbeiten")
@@ -244,3 +279,5 @@ elif st.session_state["phase"] == 1:
                 st.session_state["edit_mode"] = False
                 st.info("Änderung gespeichert! Die Tabelle wird automatisch aktualisiert.")
                 st.rerun()
+
+
